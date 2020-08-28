@@ -38,8 +38,13 @@ let typecheck (s : string) (v : evT) : bool = match s with
 (* MOD: estensione del typechecker dinamico *) 
     "dict" -> (match v with
         Dict(_) -> true |
+        _ -> false) | 
+    "fun" -> (match v with
+        FunVal(_) -> true |
+        RecFunVal(_) -> true |
         _ -> false) |
-    _ -> failwith("not a valid type");;
+    _ -> failwith("not a valid type")
+;; 
 
 (*funzioni primitive*)
 let prod x y = if (typecheck "int" x) && (typecheck "int" y)
@@ -88,6 +93,20 @@ let non x = if (typecheck "bool" x)
         Bool(false) -> Bool(true))
   else failwith("Type error");; 
 
+(* MOD - estensione delle funzioni di rts *)
+(* controlla l'esistenza di una chiave nel dizionario *)
+let rec has_key (i : ide) (lst : evT) : bool = 
+  if (typecheck "dict" lst)
+  then (match lst with 
+        Dict([]) -> false |
+        Dict((x, v)::tl)-> 
+          if (x = i)
+       (* se ho trovato la chiave restituisco true *)
+          then true 
+      (* altrimenti procedo alla chiave successiva *)
+          else has_key i (Dict(tl)))
+  else failwith("Type error");;
+ 
 (*interprete*)
 let rec eval (e : exp) (r : evT env) : evT = match e with
     Eint n -> Int n |
@@ -169,17 +188,23 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
     Haskey(i, e1) -> let dict = (eval e1 r) in
       (* effettua il controllo sul tipo *)
       if (typecheck "dict" dict) 
+(* usa la funzione di rts *)
+      then Bool(has_key i dict)
+      else failwith("has_key called on a non-dictionary value") | 
+    (* applica la funzione a tutte le coppie del dizionario *) 
+    (* valuta il dizionario *)
+    Iterate(f, e1) -> let dict = (eval e1 r) in
+      let func = (eval f r) in
+      (* effettua il controllo sul tipo *)
+      if (typecheck "fun" func && typecheck "dict" dict) 
           (* cerca la chiave *)
-      then let rec find (x : ide) (list : evT) : bool = 
+      then let rec iterate (list : evT) : (ide * evT) list = 
              (match list with 
-                Dict([]) -> false |
-                Dict((x, v)::tl)->
-                  (* se ho trovato la chiave restituisco true *)
-                  if (x = i)
-                  then true 
-                  else find i (Dict(tl)))
-        in Bool(find i dict)
-      else failwith("delete called on a non-dictionary value")
+                Dict([]) -> [] |
+                Dict((x, v)::tl)-> ("a", Int 1)::(iterate (Dict(tl))))
+        in Dict(iterate dict) 
+      else failwith("iterate called on a non-function or non-dictionary value")
+          
 ;;  
 
 (* =============================  TESTS  ================= *)
@@ -216,3 +241,7 @@ eval e6 env0;;
 (* controlla l'esistenza di una chiave nel dizionario *)
 let e7 = Haskey("banane", e4);;
 eval e7 env0;;
+
+(* applica la funzione a tutte le coppie del dizionario *)
+let e8 = Iterate(Fun("val", Sum(Den "val", Eint 1)), e4);;
+eval e8 env0;;
