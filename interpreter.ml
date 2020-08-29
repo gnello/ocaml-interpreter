@@ -11,7 +11,7 @@ type exp = Eint of int | Ebool of bool | Den of ide | Prod of exp * exp | Sum of
          | Fold of exp * exp
          | Filter of (ide list) * exp 
 (* un dizionario è una tripla <chiave, valore, DictItem> *)
-         | Edict of dicttype
+         | Edict of dicttype 
 and dicttype = Empty | DictItem of ide * exp * dicttype;; 
 
 (*ambiente polimorfo*)
@@ -94,8 +94,15 @@ let non x = if (typecheck "bool" x)
   else failwith("Type error");; 
 
 (* MOD - estensione delle funzioni di rts *) 
+
+(* verifica se un elemento è presente in una lista *)
+let rec contains i = function a::tl -> if i = a 
+  then true
+  else (contains i tl)
+                            | []   -> false;;
+
 (* controlla l'esistenza di una chiave nel dizionario *)
-let rec has_key (i : ide) (lst : evT) : bool = 
+let rec has_key (i : ide) lst : bool = 
   if (typecheck "dict" lst)
   then (match lst with 
         Dict([]) -> false |
@@ -105,7 +112,7 @@ let rec has_key (i : ide) (lst : evT) : bool =
           then true 
       (* altrimenti procedo alla chiave successiva *)
           else has_key i (Dict(tl)))
-  else failwith("Type error");;
+  else failwith("Type error");; 
  
 (*interprete*)
 let rec eval (e : exp) (r : evT env) : evT = match e with
@@ -174,7 +181,7 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
       then let rec delete (x : ide) (list : evT) : (ide * evT) list = 
              (match list with 
                 Dict([]) -> [] |
-                Dict((x, v)::tl)->
+                Dict((x, v)::tl) ->
                   (* se ho trovato la coppia restituisco il resto della lista *)
                   if (x = i)
                   then tl
@@ -221,7 +228,22 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
         in (match e1 with
               Edict(x)-> fold x |
               _ -> failwith("fold called on a non-dictionary value")) 
-      else failwith("fold called on a non-function or non-dictionary value") 
+      else failwith("fold called on a non-function or non-dictionary value") | 
+       (* filtra il dizionario *) 
+    (* valuta il dizionario *)
+    Filter(xlist, e1) -> let dict = (eval e1 r) in 
+      (* effettua il controllo sul tipo *)
+      if (typecheck "dict" dict) 
+          (* applica la funzione a tutti gli elementi del dizionario *)
+      then let rec filter (keylist : ide list) (list : evT) : (ide * evT) list = 
+             (match list with 
+                Dict([]) -> [] |
+                Dict((x, v)::tl) -> if (contains x keylist)
+                  then (x, v)::(filter keylist (Dict(tl)))
+                  else filter keylist (Dict(tl)) |
+                _ -> failwith("filter called with a non-list value"))
+        in Dict(filter xlist dict)
+      else failwith("filter called on a non-dictionary value")
 ;;  
 
 (* =============================  TESTS  ================= *)
@@ -267,3 +289,7 @@ eval e8 env0;;
       la funzione a tutte le coppie del dizionario *) 
 let e9 = Fold(Fun("val", Sum(Den "val", Eint 1)), e4);;
 eval e9 env0;;
+
+(* filtra il dizionario *) 
+let e10 = Filter(["mele"; "pere"], e4);;
+eval e10 env0;; 
