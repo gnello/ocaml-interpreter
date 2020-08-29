@@ -93,7 +93,7 @@ let non x = if (typecheck "bool" x)
         Bool(false) -> Bool(true))
   else failwith("Type error");; 
 
-(* MOD - estensione delle funzioni di rts *)
+(* MOD - estensione delle funzioni di rts *) 
 (* controlla l'esistenza di una chiave nel dizionario *)
 let rec has_key (i : ide) (lst : evT) : bool = 
   if (typecheck "dict" lst)
@@ -192,19 +192,36 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
       then Bool(has_key i dict)
       else failwith("has_key called on a non-dictionary value") | 
     (* applica la funzione a tutte le coppie del dizionario *) 
-    (* valuta il dizionario *)
+    (* valuta il dizionario e la funzione *)
     Iterate(f, e1) -> let dict = (eval e1 r) in
-      let func = (eval f r) in
+      let fClosure = (eval f r) in
       (* effettua il controllo sul tipo *)
-      if (typecheck "fun" func && typecheck "dict" dict) 
-          (* cerca la chiave *)
-      then let rec iterate (list : evT) : (ide * evT) list = 
+      if (typecheck "fun" fClosure && typecheck "dict" dict) 
+          (* applica la funzione a tutti gli elementi del dizionario *)
+      then let rec iterate (list : dicttype) : (ide * evT) list = 
              (match list with 
-                Dict([]) -> [] |
-                Dict((x, v)::tl)-> ("a", Int 1)::(iterate (Dict(tl))))
-        in Dict(iterate dict) 
-      else failwith("iterate called on a non-function or non-dictionary value")
-          
+                Empty -> [] |
+                DictItem(i, e1, e2) -> (i, eval (FunCall(f, e1)) r)::(iterate e2))
+        in (match e1 with
+              Edict(x)-> Dict(iterate x) |
+              _ -> failwith("iterate called on a non-dictionary value")) 
+      else failwith("iterate called on a non-function or non-dictionary value") |
+    (* calcola il valore ottenuto applicando sequenzialmente 
+      la funzione a tutte le coppie del dizionario *) 
+    (* valuta il dizionario e la funzione *)
+    Fold(f, e1) -> let dict = (eval e1 r) in
+      let fClosure = (eval f r) in
+      (* effettua il controllo sul tipo *)
+      if (typecheck "fun" fClosure && typecheck "dict" dict) 
+          (* applica la funzione a tutti gli elementi del dizionario *)
+      then let rec fold (list : dicttype) : evT = 
+             (match list with 
+                Empty -> Int 0 |
+                DictItem(_, e1, e2) -> sum (eval (FunCall(f, e1)) r) (fold e2))
+        in (match e1 with
+              Edict(x)-> fold x |
+              _ -> failwith("fold called on a non-dictionary value")) 
+      else failwith("fold called on a non-function or non-dictionary value") 
 ;;  
 
 (* =============================  TESTS  ================= *)
@@ -245,3 +262,8 @@ eval e7 env0;;
 (* applica la funzione a tutte le coppie del dizionario *)
 let e8 = Iterate(Fun("val", Sum(Den "val", Eint 1)), e4);;
 eval e8 env0;;
+
+(* calcola il valore ottenuto applicando sequenzialmente 
+      la funzione a tutte le coppie del dizionario *) 
+let e9 = Fold(Fun("val", Sum(Den "val", Eint 1)), e4);;
+eval e9 env0;;
