@@ -42,7 +42,7 @@ let typecheck (s : string) (v : evT) : bool = match s with
     "fun" -> (match v with
         FunVal(_) -> true |
         RecFunVal(_) -> true |
-        _ -> false) |
+        _ -> false) | 
     _ -> failwith("not a valid type")
 ;; 
 
@@ -96,23 +96,70 @@ let non x = if (typecheck "bool" x)
 (* MOD - estensione delle funzioni di rts *) 
 
 (* verifica se un elemento è presente in una lista *)
-let rec contains i = function a::tl -> if i = a 
-  then true
-  else (contains i tl)
-                            | []   -> false;;
+let rec contains i = 
+  function a::tl -> if i = a 
+    then Bool(true)
+    else (contains i tl) 
+         | [] -> Bool(false);;
+
+(* verifica se una chiave è presente in una lista di coppie chiave valore *)
+let rec containsKey i = 
+  function (a, b)::tl -> if i = a 
+    then Bool(true)
+    else (containsKey i tl) 
+         | [] -> Bool(false);;
 
 (* controlla l'esistenza di una chiave nel dizionario *)
-let rec has_key (i : ide) lst : bool = 
+let rec has_key (i : ide) lst : evT = 
   if (typecheck "dict" lst)
   then (match lst with 
-        Dict([]) -> false |
+        Dict([]) -> Bool(false) |
         Dict((x, v)::tl)-> 
           if (x = i)
        (* se ho trovato la chiave restituisco true *)
-          then true 
+          then Bool(true) 
       (* altrimenti procedo alla chiave successiva *)
           else has_key i (Dict(tl)))
   else failwith("Type error");; 
+
+(* inserisci una coppia in un dizionario *)
+let insert (i : ide) (e1 : evT) (e2 : evT) : evT =
+  if (typecheck "dict" e2) 
+  then 
+    (* controlla che la chiave non esista *)
+    if (has_key i e2 = Bool(false)) then
+      (match e2 with
+         (* se il parametro è corretto aggiungi in fondo alla lista *)
+         Dict(list) -> Dict(list@[(i, e1)]))
+    else failwith("key already exists")
+  else failwith("Type error");;
+
+(* rimuovi una coppia da un dizionario *)
+let delete (i : ide) (e1 : evT) : evT = 
+  if (typecheck "dict" e1) then 
+    let rec f (i : ide) (e1 : evT) : (ide * evT) list = 
+      (match e1 with 
+         Dict([]) -> [] |
+         Dict((x, v)::tl) -> 
+          (* se ho trovato la coppia restituisco il resto della lista *)
+           if (i = x) then tl
+        (* altrimenti lascio intatta la lista e procedo
+     alla coppia successiva *)
+           else (x, v)::(f i (Dict(tl))))
+    in Dict(f i e1)
+  else failwith("Type error");;
+
+(* filtra il dizionario *)
+let filter (e1 : ide list) (e2 : evT) : evT = 
+  if (typecheck "dict" e2) then
+    let rec f (e1 : ide list) (e2 : evT) : (ide * evT) list = 
+      (match e2 with 
+         Dict([]) -> [] |
+         Dict((x, v)::tl) -> if (contains x e1 = Bool(true))
+           then (x, v)::(f e1 (Dict(tl)))
+           else (f e1 (Dict(tl))))
+    in Dict(f e1 e2)
+  else failwith("Type error");;
  
 (*interprete*)
 let rec eval (e : exp) (r : evT env) : evT = match e with
@@ -158,46 +205,32 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
                     | Empty -> [] 
                        (* valuta il valore nell'ambiente statico e
                     continua la valutazione del dizionario rimanente *)
-                    | DictItem(i, e1, e2) -> (i, eval e1 r)::(evaldict e2 r)
-                    | _ -> failwith("non dictionary value"))
+                    | DictItem(i, e1, e2) -> let tl = (evaldict e2 r) in 
+                        (* controlla che non ci siano chiavi duplicate *)
+                        if ((containsKey i tl) = Bool(false))
+                        then let value = (eval e1 r) in
+                          if (typecheck "int" value) 
+                          then (i, value)::tl
+                          else failwith("Type error")
+                        else failwith("Duplicate keys"))
       in Dict(evaldict e1 r) | 
     (* inserisci una coppia nel dizionario*)
-    (* prima valuta b *)
+    (* prima valuta il valore da inserire *)
     Insert(i, e1, e2) -> let value = eval e1 r in 
       (* valuta il dizionario *)
-      let dict = (eval e2 r) in
-      (* effettua il controllo sul tipo *)
-      if (typecheck "dict" dict) 
-      then (match dict with
-         (* se il parametro è corretto aggiungi in fondo alla lista *)
-            Dict(list) -> Dict(list@[(i, value)]))
-      else failwith("insert called on a non-dictionary value") | 
+      let dict = (eval e2 r) in 
+      (* chiama la funzione di rts *)
+      insert i value dict | 
     (* rimuovi una coppia dal dizionario*) 
     (* valuta il dizionario *)
     Delete(i, e1) -> let dict = (eval e1 r) in
-      (* effettua il controllo sul tipo *)
-      if (typecheck "dict" dict) 
-          (* cerca la coppia da eliminare *)
-      then let rec delete (x : ide) (list : evT) : (ide * evT) list = 
-             (match list with 
-                Dict([]) -> [] |
-                Dict((x, v)::tl) ->
-                  (* se ho trovato la coppia restituisco il resto della lista *)
-                  if (x = i)
-                  then tl
-                      (* altrimenti lascio intatta la lista e procedo
-              alla coppia successiva *)
-                  else (x, v)::(delete i (Dict(tl))))
-        in Dict(delete i dict) 
-      else failwith("delete called on a non-dictionary value") |
+      (* chiama la funzione di rts *)
+      delete i dict |
     (* cerca una chiave dal dizionario*) 
     (* valuta il dizionario *)
-    Haskey(i, e1) -> let dict = (eval e1 r) in
-      (* effettua il controllo sul tipo *)
-      if (typecheck "dict" dict) 
-(* usa la funzione di rts *)
-      then Bool(has_key i dict)
-      else failwith("has_key called on a non-dictionary value") | 
+    Haskey(i, e1) -> let dict = (eval e1 r) in 
+      (* chiama la funzione di rts *)
+      (has_key i dict) | 
     (* applica la funzione a tutte le coppie del dizionario *) 
     (* valuta il dizionario e la funzione *)
     Iterate(f, e1) -> let dict = (eval e1 r) in
@@ -210,9 +243,8 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
                 Empty -> [] |
                 DictItem(i, e1, e2) -> (i, eval (FunCall(f, e1)) r)::(iterate e2))
         in (match e1 with
-              Edict(x)-> Dict(iterate x) |
-              _ -> failwith("iterate called on a non-dictionary value")) 
-      else failwith("iterate called on a non-function or non-dictionary value") |
+              Edict(x)-> Dict(iterate x)) 
+      else failwith("Type error") |
     (* calcola il valore ottenuto applicando sequenzialmente 
       la funzione a tutte le coppie del dizionario *) 
     (* valuta il dizionario e la funzione *)
@@ -226,24 +258,14 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
                 Empty -> Int 0 |
                 DictItem(_, e1, e2) -> sum (eval (FunCall(f, e1)) r) (fold e2))
         in (match e1 with
-              Edict(x)-> fold x |
-              _ -> failwith("fold called on a non-dictionary value")) 
-      else failwith("fold called on a non-function or non-dictionary value") | 
+              Edict(x)-> fold x) 
+      else failwith("Type error") | 
        (* filtra il dizionario *) 
     (* valuta il dizionario *)
     Filter(xlist, e1) -> let dict = (eval e1 r) in 
-      (* effettua il controllo sul tipo *)
-      if (typecheck "dict" dict) 
-          (* applica la funzione a tutti gli elementi del dizionario *)
-      then let rec filter (keylist : ide list) (list : evT) : (ide * evT) list = 
-             (match list with 
-                Dict([]) -> [] |
-                Dict((x, v)::tl) -> if (contains x keylist)
-                  then (x, v)::(filter keylist (Dict(tl)))
-                  else filter keylist (Dict(tl)) |
-                _ -> failwith("filter called with a non-list value"))
-        in Dict(filter xlist dict)
-      else failwith("filter called on a non-dictionary value")
+      (* chiama la funzione di rts *) 
+      (filter xlist dict)
+     
 ;;  
 
 (* =============================  TESTS  ================= *)
@@ -293,3 +315,18 @@ eval e9 env0;;
 (* filtra il dizionario *) 
 let e10 = Filter(["mele"; "pere"], e4);;
 eval e10 env0;; 
+
+(* test avanzati *)
+
+(* testa che non si possa instanziare un dizionario con chiavi duplicate *)
+let e11 = Edict(DictItem("mele", Eint 430, DictItem("mele", Eint 312, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty)))));; 
+eval e11 env0;; 
+
+(* testa che non si possano inserire chiavi duplicate *) 
+let e12 = Insert("kiwi", Eint 300, e4);;
+let e13 = Insert("kiwi", Eint 300, e12);;
+eval e13 env0;;
+
+(* testa che non si possano inserire valori diversi da int *) 
+let e14 = Edict(DictItem("mele", Eint 430, DictItem("banane", Ebool true, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty)))));; 
+eval e14 env0;; 
