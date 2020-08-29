@@ -124,7 +124,7 @@ let rec has_key (i : ide) lst : evT =
 
 (* inserisci una coppia in un dizionario *)
 let insert (i : ide) (e1 : evT) (e2 : evT) : evT =
-  if (typecheck "dict" e2) 
+  if (typecheck "int" e1) && (typecheck "dict" e2)
   then 
     (* controlla che la chiave non esista *)
     if (has_key i e2 = Bool(false)) then
@@ -302,6 +302,8 @@ eval e6 env0;;
 (* controlla l'esistenza di una chiave nel dizionario *)
 let e7 = Haskey("banane", e4);;
 eval e7 env0;;
+let e16 = Haskey("bananajoe", e4);;
+eval e16 env0;;
 
 (* applica la funzione a tutte le coppie del dizionario *)
 let e8 = Iterate(Fun("val", Sum(Den "val", Eint 1)), e4);;
@@ -327,6 +329,24 @@ let e12 = Insert("kiwi", Eint 300, e4);;
 let e13 = Insert("kiwi", Eint 300, e12);;
 eval e13 env0;;
 
-(* testa che non si possano inserire valori diversi da int *) 
+(* testa che non si possa instanziare un dizionario 
+con valori diversi da int (type checking dinamico) *) 
 let e14 = Edict(DictItem("mele", Eint 430, DictItem("banane", Ebool true, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty)))));; 
 eval e14 env0;; 
+
+(* testa che non si possano inserire valori 
+diversi da int (type checking dinamico) *) 
+let e15 = Insert("kiwi", Ebool true, e4);;
+eval e15 env0;;
+
+(* testa che non si possa usare iterate con 
+   un parametro diverso da una funzione
+   (type checking dinamico) *)
+let e17 = Iterate(Eint 100, e4);;
+eval e17 env0;;
+
+(* testa che non si possa usare fold con 
+   un parametro diverso da una funzione
+   (type checking dinamico) *)
+let e18 = Fold(Eint 100, e4);;
+eval e18 env0;;
