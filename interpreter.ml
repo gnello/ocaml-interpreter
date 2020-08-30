@@ -155,8 +155,11 @@ let filter (e1 : ide list) (e2 : evT) : evT =
     let rec f (e1 : ide list) (e2 : evT) : (ide * evT) list = 
       (match e2 with 
          Dict([]) -> [] |
+         (* controllo la chiave della coppia *)
          Dict((x, v)::tl) -> if (contains x e1 = Bool(true))
-           then (x, v)::(f e1 (Dict(tl)))
+           (* se è nella lista procedo *)
+           then (x, v)::(f e1 (Dict(tl))) 
+(* altrimenti elimino la coppia e procedo *)
            else (f e1 (Dict(tl))))
     in Dict(f e1 e2)
   else failwith("Type error");;
@@ -208,9 +211,13 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
                     | DictItem(i, e1, e2) -> let tl = (evaldict e2 r) in 
                         (* controlla che non ci siano chiavi duplicate *)
                         if ((containsKey i tl) = Bool(false))
+                            (* valuto e1 *)
                         then let value = (eval e1 r) in
+                          (* controllo il tipo *)
                           if (typecheck "int" value) 
-                          then (i, value)::tl
+                              (* se int allora procedo *)
+                          then (i, value)::tl 
+(* altrimenti non va bene *)
                           else failwith("Type error")
                         else failwith("Duplicate keys"))
       in Dict(evaldict e1 r) | 
@@ -241,6 +248,10 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
       then let rec iterate (list : dicttype) : (ide * evT) list = 
              (match list with 
                 Empty -> [] |
+                (* produco una lista con l'identificatore
+                originale della coppia e una valutazione 
+                della chiamata di funzione da iterare 
+                sul valore della coppia originale *)
                 DictItem(i, e1, e2) -> (i, eval (FunCall(f, e1)) r)::(iterate e2))
         in (match e1 with
               Edict(x)-> Dict(iterate x)) 
@@ -255,7 +266,10 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
           (* applica la funzione a tutti gli elementi del dizionario *)
       then let rec fold (list : dicttype) : evT = 
              (match list with 
-                Empty -> Int 0 |
+                Empty -> Int 0 | 
+                   (* sommo le valutazioni della chiamata di 
+                   funzione da iterare 
+                sui valori delle coppie *)
                 DictItem(_, e1, e2) -> sum (eval (FunCall(f, e1)) r) (fold e2))
         in (match e1 with
               Edict(x)-> fold x) 
