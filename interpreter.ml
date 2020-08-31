@@ -217,7 +217,7 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
                           if (typecheck "int" value) 
                               (* se int allora procedo *)
                           then (i, value)::tl 
-(* altrimenti non va bene *)
+                          (* altrimenti non va bene *)
                           else failwith("Type error")
                         else failwith("Duplicate keys"))
       in Dict(evaldict e1 r) | 
