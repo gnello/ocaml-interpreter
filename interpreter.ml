@@ -342,7 +342,7 @@ eval e10 env0;;
 let e20 = Filter(["angurie"; "ananas"], e4);;
 eval e20 env0;; 
 
-(* test sui vincoli *)
+(* test sui vincoli: tutti i test seguenti devono restituire un Type Error *)
 
 (* testa che non si possa instanziare un dizionario con chiavi duplicate *)
 let e11 = Edict(DictItem("mele", Eint 430, DictItem("mele", Eint 312, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty)))));; 
