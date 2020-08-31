@@ -313,9 +313,15 @@ eval e5 env0;;
 let e6 = Delete("pere", e4);;
 eval e6 env0;;
 
+(* rimuovi un elemento non esistente dal dizionario *)
+let e19 = Delete("cocomeri", e4);;
+eval e19 env0;;
+
 (* controlla l'esistenza di una chiave nel dizionario *)
 let e7 = Haskey("banane", e4);;
 eval e7 env0;;
+
+(* controlla la non esistenza di una chiave nel dizionario *)
 let e16 = Haskey("bananajoe", e4);;
 eval e16 env0;;
 
@@ -332,7 +338,11 @@ eval e9 env0;;
 let e10 = Filter(["mele"; "pere"], e4);;
 eval e10 env0;; 
 
-(* test avanzati *)
+(* filtra il dizionario con elementi non esistenti *) 
+let e20 = Filter(["angurie"; "ananas"], e4);;
+eval e20 env0;; 
+
+(* test sui vincoli *)
 
 (* testa che non si possa instanziare un dizionario con chiavi duplicate *)
 let e11 = Edict(DictItem("mele", Eint 430, DictItem("mele", Eint 312, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty)))));; 
