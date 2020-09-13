@@ -1,8 +1,9 @@
 type ide = string;;
+
 type exp = Eint of int | Ebool of bool | Den of ide | Prod of exp * exp | Sum of exp * exp | Diff of exp * exp |
            Eq of exp * exp | Minus of exp | IsZero of exp | Or of exp * exp | And of exp * exp | Not of exp |
            Ifthenelse of exp * exp * exp | Let of ide * exp * exp | Fun of ide * exp | FunCall of exp * exp |
-           Letrec of ide * exp * exp 
+           Letrec of ide * exp * exp
 (* MOD: estensione dei tipi *) 
          | Insert of ide * exp * exp
          | Delete of ide * exp
@@ -18,14 +19,14 @@ and dicttype = Empty | DictItem of ide * exp * dicttype;;
 type 't env = ide -> 't;;
 let emptyenv (v : 't) = function x -> v;;
 let applyenv (r : 't env) (i : ide) = r i;;
-let bind (r : 't env) (i : ide) (v : 't) = function x -> if x = i then v else applyenv r x;;
+let bind (r : 't env) (i : ide) (v : 't) = function x -> if x = i then v else applyenv r x;; 
 
 (*tipi esprimibili*)
 type evT = Int of int | Bool of bool | Unbound | FunVal of evFun | RecFunVal of ide * evFun 
 (* MOD: estensione dei tipi esprimibili *)
          | Dict of (ide * evT) list
 and evFun = ide * exp * evT env
-
+              
 (*rts*)
 (*type checking*)
 let typecheck (s : string) (v : evT) : bool = match s with
@@ -163,7 +164,7 @@ let filter (e1 : ide list) (e2 : evT) : evT =
            else (f e1 (Dict(tl))))
     in Dict(f e1 e2)
   else failwith("Type error");;
- 
+
 (*interprete*)
 let rec eval (e : exp) (r : evT env) : evT = match e with
     Eint n -> Int n |
@@ -195,7 +196,7 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
            let rEnv = (bind fDecEnv g fClosure) in
            let aEnv = (bind rEnv arg aVal) in
            eval fBody aEnv |
-         _ -> failwith("non functional value")) |
+         _ -> failwith("non functional value")) | 
     Letrec(f, funDef, letBody) ->
       (match funDef with
          Fun(i, fBody) -> let r1 = (bind r f (RecFunVal(f, (i, fBody, r)))) in
@@ -245,16 +246,16 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
       (* effettua il controllo sul tipo *)
       if (typecheck "fun" fClosure && typecheck "dict" dict) 
           (* applica la funzione a tutti gli elementi del dizionario *)
-      then let rec iterate (list : dicttype) : (ide * evT) list = 
+      then let rec iterate (list : (ide * evT) list) : (ide * evT) list = 
              (match list with 
-                Empty -> [] |
+                []-> [] |
                 (* produco una lista con l'identificatore
                 originale della coppia e una valutazione 
                 della chiamata di funzione da iterare 
-                sul valore della coppia originale *)
-                DictItem(i, e1, e2) -> (i, eval (FunCall(f, e1)) r)::(iterate e2))
-        in (match e1 with
-              Edict(x)-> Dict(iterate x)) 
+                  sul valore della coppia *)
+                (i, e1)::e2 -> (i, (applyFun f e1 r))::(iterate e2))
+        in (match dict with
+              Dict(x)-> Dict(iterate x)) 
       else failwith("Type error") |
     (* calcola il valore ottenuto applicando sequenzialmente 
       la funzione a tutte le coppie del dizionario *) 
@@ -264,21 +265,31 @@ let rec eval (e : exp) (r : evT env) : evT = match e with
       (* effettua il controllo sul tipo *)
       if (typecheck "fun" fClosure && typecheck "dict" dict) 
           (* applica la funzione a tutti gli elementi del dizionario *)
-      then let rec fold (list : dicttype) : evT = 
+      then let rec fold (list : (ide * evT) list) : evT = 
              (match list with 
-                Empty -> Int 0 | 
+                [] -> Int 0 | 
                    (* sommo le valutazioni della chiamata di 
                    funzione da iterare 
                 sui valori delle coppie *)
-                DictItem(_, e1, e2) -> sum (eval (FunCall(f, e1)) r) (fold e2))
-        in (match e1 with
-              Edict(x)-> fold x) 
+                (i, e1)::e2 -> sum (applyFun f e1 r) (fold e2))
+        in (match dict with
+              Dict(x)-> fold x) 
       else failwith("Type error") | 
        (* filtra il dizionario *) 
     (* valuta il dizionario *)
     Filter(xlist, e1) -> let dict = (eval e1 r) in 
       (* chiama la funzione di rts *) 
       (filter xlist dict)
+    and applyFun (f : exp) (x : evT) (r : evT env): evT =
+      let fClosure = (eval f r) in
+      (match fClosure with
+         FunVal(arg, fBody, fDecEnv) -> 
+           eval fBody (bind fDecEnv arg x) |
+         RecFunVal(g, (arg, fBody, fDecEnv)) -> 
+           let rEnv = (bind fDecEnv g fClosure) in
+           let aEnv = (bind rEnv arg x) in
+           eval fBody aEnv |
+         _ -> failwith("non functional value"))
      
 ;;  
 
@@ -329,10 +340,17 @@ eval e16 env0;;
 let e8 = Iterate(Fun("val", Sum(Den "val", Eint 1)), e4);;
 eval e8 env0;;
 
+(* applica la funzione a tutte le coppie del dizionario creato sul momento*)
+let e19 = Iterate(Fun("val", Sum(Den "val", Eint 1)), Insert("mele", Eint 430, Edict(DictItem("banane", Eint 312, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty))))));;
+eval e19 env0;;
+
 (* calcola il valore ottenuto applicando sequenzialmente 
       la funzione a tutte le coppie del dizionario *) 
 let e9 = Fold(Fun("val", Sum(Den "val", Eint 1)), e4);;
 eval e9 env0;;
+
+let e20 = Fold(Fun("val", Sum(Den "val", Eint 1)), Insert("mele", Eint 430, Edict(DictItem("banane", Eint 312, DictItem("arance", Eint 525, DictItem("pere", Eint 217, Empty))))));;
+eval e20 env0;;
 
 (* filtra il dizionario *) 
 let e10 = Filter(["mele"; "pere"], e4);;
